@@ -5,5 +5,8 @@ defaults:
   data_hash: yaml_data
 
 hierarchy:
+  - name: "Per-OS defaults"
+    path: "%{facts.kernel}.yaml"
+
   - name: "Common data"
     path: "common.yaml"

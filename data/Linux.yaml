@@ -1,0 +1,6 @@
+---
+github_actions_runner::base_dir_name: '/some_dir/actions-runner'
+github_actions_runner::package_name: 'actions-runner-linux-x64'
+github_actions_runner::package_extension: 'tar.gz'
+github_actions_runner::user: 'root'
+github_actions_runner::group: 'root'
