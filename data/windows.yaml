@@ -1,5 +1,6 @@
 ---
 github_actions_runner::base_dir_name: 'C:/some_dir/actions-runner'
+github_actions_runner::temp_path: 'C:/Windows/temp'
 github_actions_runner::package_name: 'actions-runner-win-x64'
 github_actions_runner::package_extension: 'zip'
 github_actions_runner::user: 'Administrator'

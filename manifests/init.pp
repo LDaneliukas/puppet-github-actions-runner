@@ -13,6 +13,9 @@
 # * base_dir_name
 #  Absolutepath, Location of the base directory for actions runner to be installed.
 #
+# * temp_path
+#  Absolutepath, Location that will be used as temp.
+#
 # * org_name
 #  String, actions runner org name.
 #
@@ -24,6 +27,9 @@
 #
 # * package_name
 # String, GitHub Actions runner offical package name.
+#
+# * package_extension
+# String, GitHub Actions runner offical package extension.
 #
 # * package_ensure
 # String, GitHub Actions runner version to be used.
@@ -58,8 +64,10 @@
 class github_actions_runner (
   Enum['present', 'absent'] $ensure,
   Stdlib::Absolutepath      $base_dir_name,
+  Stdlib::Absolutepath      $temp_path,
   String[1]                 $personal_access_token,
   String[1]                 $package_name,
+  String[1]                 $package_extension,
   String[1]                 $package_ensure,
   String[1]                 $repository_url,
   String[1]                 $user,
