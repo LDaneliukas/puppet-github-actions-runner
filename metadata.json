@@ -19,9 +19,12 @@
     {
       "name": "puppet-archive",
       "version_requirement": ">= 1.1.2 < 5.0.0"
+    },
+    {
+      "name": "puppetlabs-powershell",
+      "version_requirement": ">= 3.0.0 <= 5.0.0"
     }
   ],
-  "data_provider": "hiera",
   "operatingsystem_support": [
     {
       "operatingsystem": "Debian",
@@ -40,6 +43,12 @@
       "operatingsystem": "Ubuntu",
       "operatingsystemrelease": [
         "18.04"
+      ]
+    },
+    {
+      "operatingsystem": "Windows",
+      "operatingsystemrelease": [
+        "2016"
       ]
     }
   ],
