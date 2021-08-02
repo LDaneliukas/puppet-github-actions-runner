@@ -4,6 +4,7 @@
 fixtures:
   forge_modules:
     stdlib: "puppetlabs/stdlib"
+    powershell: "puppetlabs-powershell"
   repositories:
     archive:
       repo: "https://github.com/voxpupuli/puppet-archive.git"
