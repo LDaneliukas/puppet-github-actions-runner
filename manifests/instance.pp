@@ -15,10 +15,10 @@
 # String, GitHub PAT with admin permission on the repositories or the origanization.(Default: Value set by github_actions_runner Class)
 #
 # * user
-# String, User to be used in Service and directories.(Default: Value set by github_actions_runner Class)
+# String, User to be used in Service and directories. (Default: Value set by github_actions_runner Class)
 #
 # * group
-# String, Group to be used in Service and directories.(Default: Value set by github_actions_runner Class)
+# String, Group to be used in Service and directories. (Default: Value set by github_actions_runner Class)
 #
 # * hostname
 # String, actions runner name.
@@ -59,12 +59,89 @@ define github_actions_runner::instance (
   Optional[String[1]]        $repo_name             = undef,
 ) {
 
+  $active_service = $ensure ? {
+    'present' => true,
+    'absent'  => false,
+  }
+
+  $enable_service = $ensure ? {
+    'present' => true,
+    'absent'  => false,
+  }
+
+  $archive_name = "${github_actions_runner::package_name}-${github_actions_runner::package_ensure}.${github_actions_runner::package_extension}" # lint:ignore:140chars
+
+  case $::facts['kernel'] {
+    'Linux': {
+      $config_script = 'configure_install_runner.sh'
+      exec { "${instance_name}-run_configure_install_runner":
+        user        => $user,
+        cwd         => "${github_actions_runner::root_dir}/${instance_name}",
+        command     => "${github_actions_runner::root_dir}/${instance_name}/${$config_script}",
+        refreshonly => true
+      }
+      systemd::unit_file { "github-actions-runner.${instance_name}.service":
+        ensure  => $ensure,
+        enable  => $enable_service,
+        active  => $active_service,
+        content => epp('github_actions_runner/github-actions-runner.service.epp', {
+          instance_name => $instance_name,
+          root_dir      => $github_actions_runner::root_dir,
+          user          => $user,
+          group         => $group,
+          http_proxy    => $http_proxy,
+          https_proxy   => $https_proxy,
+          no_proxy      => $no_proxy,
+        }),
+        require => [File["${github_actions_runner::root_dir}/${instance_name}/configure_install_runner.sh"],
+                  Exec["${instance_name}-run_configure_install_runner"]],
+      }
+      Exec { "${instance_name}-ownership":
+        command     => "/bin/chown -R ${user}:${group} ${github_actions_runner::root_dir}/${instance_name}",
+        user        => $user,
+        cwd         => $github_actions_runner::root_dir,
+        refreshonly => true,
+        path        => "${github_actions_runner::temp_path}/${instance_name}-${archive_name}",
+        subscribe   => Archive["${instance_name}-${archive_name}"]
+
+      }
+    }
+    'windows': {
+      $config_script = 'configure_install_runner.ps1'
+      if $ensure == 'present' {
+        $ensure_service = 'running'
+      }
+      exec { "${instance_name}-run_configure_install_runner":
+        cwd         => "${github_actions_runner::root_dir}/${instance_name}",
+        command     => "${github_actions_runner::root_dir}/${instance_name}/${$config_script}",
+        provider    => 'powershell',
+        refreshonly => true
+      }
+      service { "actions.runner._services.${hostname}-${instance_name}":
+        ensure  => $ensure_service,
+        enable  => $enable_service,
+        require => [File["${github_actions_runner::root_dir}/${instance_name}/configure_install_runner.ps1"],
+                    Exec["${instance_name}-run_configure_install_runner"]],
+      }
+      exec { "${instance_name}-ownership":
+        command     => "Icacls ${github_actions_runner::root_dir}/${instance_name} /T /Q /grant ${user}:F",
+        provider    => 'powershell',
+        refreshonly => true,
+        subscribe   => Archive["${instance_name}-${archive_name}"]
+      }
+    }
+    default : {
+      fail("Platform ${::facts['kernel']} is not supported")
+    }
+  }
+
   if $labels {
     $flattend_labels_list=join($labels, ',')
     $assured_labels="--labels ${flattend_labels_list}"
   } else {
     $assured_labels = ''
   }
+
 
   if $org_name {
     if $repo_name {
@@ -84,7 +161,6 @@ define github_actions_runner::instance (
     fail("Either 'org_name' or 'enterprise_name' is required to create runner instances")
   }
 
-  $archive_name =  "${github_actions_runner::package_name}-${github_actions_runner::package_ensure}.tar.gz"
   $source = "${github_actions_runner::repository_url}/v${github_actions_runner::package_ensure}/${archive_name}"
 
   $ensure_instance_directory = $ensure ? {
@@ -103,7 +179,7 @@ define github_actions_runner::instance (
 
   archive { "${instance_name}-${archive_name}":
     ensure       => $ensure,
-    path         => "/tmp/${instance_name}-${archive_name}",
+    path         => "${github_actions_runner::temp_path}/${instance_name}-${archive_name}",
     user         => $user,
     group        => $group,
     source       => $source,
@@ -114,12 +190,12 @@ define github_actions_runner::instance (
     require      => File["${github_actions_runner::root_dir}/${instance_name}"],
   }
 
-  file { "${github_actions_runner::root_dir}/${name}/configure_install_runner.sh":
+  file { "${github_actions_runner::root_dir}/${name}/${config_script}":
     ensure  => $ensure,
     mode    => '0755',
     owner   => $user,
     group   => $group,
-    content => epp('github_actions_runner/configure_install_runner.sh.epp', {
+    content => epp("github_actions_runner/${config_script}.epp", {
       personal_access_token => $personal_access_token,
       token_url             => $token_url,
       instance_name         => $instance_name,
@@ -128,51 +204,7 @@ define github_actions_runner::instance (
       hostname              => $hostname,
       assured_labels        => $assured_labels,
     }),
-    notify  => Exec["${instance_name}-run_configure_install_runner.sh"],
+    notify  => Exec["${instance_name}-run_configure_install_runner"],
     require => Archive["${instance_name}-${archive_name}"],
   }
-
-  exec { "${instance_name}-ownership":
-    user        => $user,
-    cwd         => $github_actions_runner::root_dir,
-    command     => "/bin/chown -R ${user}:${group} ${github_actions_runner::root_dir}/${instance_name}",
-    refreshonly => true,
-    path        => "/tmp/${instance_name}-${archive_name}",
-    subscribe   => Archive["${instance_name}-${archive_name}"]
-  }
-
-  exec { "${instance_name}-run_configure_install_runner.sh":
-    user        => $user,
-    cwd         => "${github_actions_runner::root_dir}/${instance_name}",
-    command     => "${github_actions_runner::root_dir}/${instance_name}/configure_install_runner.sh",
-    refreshonly => true
-  }
-
-  $active_service = $ensure ? {
-    'present' => true,
-    'absent'  => false,
-  }
-
-  $enable_service = $ensure ? {
-    'present' => true,
-    'absent'  => false,
-  }
-
-  systemd::unit_file { "github-actions-runner.${instance_name}.service":
-    ensure  => $ensure,
-    enable  => $enable_service,
-    active  => $active_service,
-    content => epp('github_actions_runner/github-actions-runner.service.epp', {
-      instance_name => $instance_name,
-      root_dir      => $github_actions_runner::root_dir,
-      user          => $user,
-      group         => $group,
-      http_proxy    => $http_proxy,
-      https_proxy   => $https_proxy,
-      no_proxy      => $no_proxy,
-    }),
-    require => [File["${github_actions_runner::root_dir}/${instance_name}/configure_install_runner.sh"],
-                Exec["${instance_name}-run_configure_install_runner.sh"]],
-  }
-
 }
