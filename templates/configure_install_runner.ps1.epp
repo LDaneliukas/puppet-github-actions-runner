@@ -1,0 +1,27 @@
+<%- | String $personal_access_token,
+      String $token_url,
+      String $instance_name,
+      Stdlib::Absolutepath $root_dir,
+      String $url,
+      String $hostname,
+      String $assured_labels,
+| -%>
+# This file managed by Puppet
+# Configure the action runner after the package file has been downloaded.
+
+# Get registration token.
+$token=(Invoke-RestMethod -Uri <%= $token_url %> -Method POST -Headers @{"authorization" = "token <%= $personal_access_token %>"}).token;
+
+# (Optional) Remove previous config.
+<%= $root_dir %>/<%= $instance_name %>/config.cmd remove --url <%= $url %> --token $token --name <%= $hostname %>-<%= $instance_name %> | Out-Null;
+
+# Configure the runner.
+<%= $root_dir %>/<%= $instance_name %>/config.cmd `
+ --unattended `
+ --replace `
+ --name <%= $hostname %>-<%= $instance_name %> `
+ --url <%= $url %> `
+ --token $token `
+ --runasservice `
+ <%= $assured_labels %> `
+ | Out-Null;
